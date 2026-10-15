@@ -18,6 +18,48 @@ pi install git:github.com/civaapple-alt/pi-extensions
 2. **默认都不扰民**：observe 需 `/observe` 开启、probe 需 `PI_PROBE=1` 启动、router 是不选就不生效的虚拟模型——全装也零影响，除非主动启用
 3. **本地单文件安装**：`pi install ./pi-extensions/extensions/observe.ts`（文件路径=只装这一个）
 
+## pi 的扩展加载渠道与目录结构
+
+### 三种加载渠道（`pi config` 按此分组）
+
+| 渠道 | 位置/声明 | `pi config` 组名 |
+|---|---|---|
+| 散装文件 | `~/.pi/agent/extensions/` 下的 .ts/.js，自动发现 | `User (~/.pi/agent/)` |
+| 包 | settings.json 的 `packages` 数组（npm/git/本地） | `npm:xxx` / `git:xxx` |
+| 显式配置 | settings.json 的 `extensions` 数组 | 按来源标注 |
+
+散装与包可能同时存在；同名资源会 collision 警告，装包前应清理散装文件。
+
+### git 源安装后的目录结构
+
+以本包为例，`pi install git:github.com/civaapple-alt/pi-extensions` 后：
+
+```
+~/.pi/agent/
+├── git/github.com/civaapple-alt/pi-extensions/     # git 克隆缓存（带 remote，用于 fetch 更新）
+├── tmp/extensions/git-github.com/0c514c46/         # 实际加载的副本，目录名 = 锁定的 commit 短哈希
+│   └── civaapple-alt/pi-extensions/
+├── extensions/                                      # 散装扩展目录（渠道 1）
+└── settings.json                                    # packages 声明: ["git:github.com/civaapple-alt/pi-extensions"]
+```
+
+**pi 永远加载 `tmp/<hash>/` 下的副本**，且 git 源会 pinned 到安装时的 commit——远程 main 推了新提交，不执行 `pi update` 就仍跑旧版本（可复现特性）。
+
+### 更新流程
+
+```
+改本地工作副本 → commit → push 远程
+→ pi update --extensions
+   ├─ git/ 目录 fetch 拿到新 commit
+   └─ tmp/ 出现新哈希目录，加载切换到新版本（旧目录由 pi 清理）
+```
+
+开发期想立即试本地改动、不走 push：
+
+```bash
+pi -e ./pi-extensions    # 一次性从本地路径加载，不写入 settings
+```
+
 ## 扩展一览
 
 ### observe — 观察模式
