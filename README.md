@@ -76,20 +76,28 @@ pi -e ./pi-extensions    # 一次性从本地路径加载，不写入 settings
 **信息流（stream）**：不暂停、不弹窗，把批次摘要作为消息条目写入对话流，供事后翻阅。
 
 - 设计文档与开发历程见本地仓库的 `docs/proposals/observe-mode.md`（Observe Mode 提案）
-- **依赖报幕约定**：摘要的"目标"行来自模型的报幕输出。pi 的扩展包无法分发全局 context 文件，请自建 `~/.pi/AGENTS.md`（pi 自动加载），内容如下：
+- **依赖报幕约定**：摘要的"目标"行来自模型的报幕输出。pi 的扩展包无法分发全局 context 文件，请自建 `~/.pi/AGENTS.md`（pi 自动加载），内容如下（指令用英文以提升遵循度，报幕输出用中文）：
 
 ```markdown
-# 执行报幕
+# Global Working Rules
 
-在发起任何工具调用之前，先输出 1-2 句话说明：
-1. 本步目标：这一步要达成什么
-2. 工具清单：将调用哪些工具（批量调用时列出关键几个）
-3. 原因：为什么需要这一步
+## Execution narration (required before EVERY tool batch)
 
-- 仅在有工具调用时需要报幕；纯文字回答不用
-- 报幕要具体，不要泛泛
-- 使用 codemode 做批量操作时，报幕覆盖整批，且脚本首行注释写明本批目标
-- 一次 API 调用返回多个工具调用时，视为一个批次整体说明
+Before issuing ANY tool call(s), first output 1-2 short sentences stating:
+1. Goal — what this step accomplishes
+2. Tools — which tools you will call (for batches, name the key ones)
+3. Why — the reason this step is needed
+
+Rules:
+- Required on every turn that contains tool calls. No exceptions — including
+  quick, single-file edits you consider trivial.
+- Not required for pure-text answers.
+- Be specific, not vague.
+- For codemode batches: narrate the whole batch, and put the batch goal in the
+  script's first comment.
+- When one response contains multiple tool calls, describe them as ONE batch.
+
+Write the narration itself in Chinese (the user's language).
 ```
 
 ### kimi-auto-router — Kimi 模型自动路由
