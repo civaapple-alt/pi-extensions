@@ -1,0 +1,15 @@
+{
+	"name": "pi-extensions",
+	"version": "0.1.0",
+	"description": "Personal pi coding agent extensions: observe mode, kimi auto-router, event probe",
+	"keywords": ["pi-package"],
+	"license": "MIT",
+	"repository": "https://github.com/civaapple-alt/pi-extensions",
+	"pi": {
+		"extensions": [
+			"./extensions/observe.ts",
+			"./extensions/kimi-auto-router.ts",
+			"./extensions/probe.ts"
+		]
+	}
+}
