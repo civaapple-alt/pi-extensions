@@ -4,9 +4,10 @@
 
 ## [Unreleased]
 
-### Fixed (observe)
+### Changed (observe)
 
-- 信息流模式的摘要从 `custom_message` 改为 custom entry + renderer：对话流中同样可见，但**不再进入模型上下文**（原实现每个摘要都会被送给模型，浪费 token 且干扰判断）
+- 信息流模式重构：`message_end` 暂存摘要、首个 `tool_call` 时落账——摘要现在位于**报幕/工具调用与工具执行结果之间**（原先在 turn_end 落账，出现在工具块下方）；不进入模型上下文（custom entry + renderer）
+- 新增 `PI_OBSERVE=off|pause|stream` 环境变量，可指定初始模式（调试/固定偏好）
 
 ## [0.3.0] - 2026-10-15
 

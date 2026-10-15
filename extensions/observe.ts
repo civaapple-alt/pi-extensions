@@ -25,8 +25,12 @@ interface SummaryData {
 
 type Mode = "off" | "pause" | "stream";
 
-let mode: Mode = "off";
+/** 支持 PI_OBSERVE=off|pause|stream 环境变量指定初始模式（调试/固定偏好用） */
+const envMode = process.env.PI_OBSERVE;
+let mode: Mode = envMode === "pause" || envMode === "stream" ? envMode : "off";
 let releaseRun = false;
+let stepCounter = 0;
+let pendingSummary: SummaryData | undefined; // message_end 暂存，首个 tool_call 时落账
 
 const MODE_LABEL: Record<Mode, string> = {
 	off: "关",
@@ -149,30 +153,42 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("before_agent_start", async () => {
 		releaseRun = false; // 新 run 重新步进
+		stepCounter = 0;
+	});
+
+	pi.on("message_end", async (event) => {
+		if (mode !== "stream") return;
+		const msg = event.message;
+		if (msg.role !== "assistant") return;
+		const { narration, tools } = extractBatch(msg);
+		if (tools.length === 0) {
+			pendingSummary = undefined;
+			return;
+		}
+		stepCounter++;
+		// 暂存摘要；落账时机在首个 tool_call（assistant 消息已持久化、工具结果未写入），
+		// 使摘要在对话流中位于 报幕/工具调用 与 工具执行结果 之间。
+		// custom entry 不进入模型上下文（不花 token），由注册的 renderer 渲染。
+		// 注：此时尚未执行，codemode 的内部调用不可见（只显示脚本行）。
+		pendingSummary = { lines: buildLines(stepCounter - 1, narration, tools, false) };
+	});
+
+	pi.on("tool_call", async (event) => {
+		if (mode !== "stream" || !pendingSummary) return;
+		if (event.parentToolCallId) return; // 只认批次的第一个顶层调用（codemode 内部调用跳过）
+		pi.appendEntry<SummaryData>(ENTRY_TYPE, pendingSummary);
+		pendingSummary = undefined;
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
-		if (mode === "off" || !ctx.hasUI || ctx.mode !== "tui") return;
+		if (mode !== "pause" || !ctx.hasUI || ctx.mode !== "tui") return;
 
 		const { narration, tools } = extractBatch((event as { message?: unknown }).message);
-		if (tools.length === 0) return; // 纯文字 turn：run 即将自然结束，无需观察
+		if (tools.length === 0) return; // 纯文字 turn：run 即将自然结束，无需暂停
 
 		attachNested(event, tools);
 
 		const turnIndex = (event as { turnIndex?: number }).turnIndex ?? 0;
-
-		if (mode === "stream") {
-			// 信息流模式：custom entry 渲染进对话流，但不进入模型上下文（不花 token）
-			return {
-				entries: [
-					{
-						type: "custom",
-						customType: ENTRY_TYPE,
-						data: { lines: buildLines(turnIndex, narration, tools, false) } satisfies SummaryData,
-					},
-				],
-			};
-		}
 
 		if (releaseRun) return;
 
