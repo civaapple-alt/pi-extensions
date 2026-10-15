@@ -2,6 +2,12 @@
 
 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Fixed (observe)
+
+- 信息流模式的摘要从 `custom_message` 改为 custom entry + renderer：对话流中同样可见，但**不再进入模型上下文**（原实现每个摘要都会被送给模型，浪费 token 且干扰判断）
+
 ## [0.3.0] - 2026-10-15
 
 ### Added (observe)

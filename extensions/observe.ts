@@ -7,15 +7,21 @@
  *   （报幕叙述 + 工具清单 + codemode 嵌套展开），对话框三选：
  *   继续（步进）/ 放行到结束 / 终止 run。Esc 视同继续。
  *
- * 信息流（stream）：不暂停不弹窗，把批次摘要作为 custom_message 条目
- *   留在对话流中，供事后翻阅。
+ * 信息流（stream）：不暂停不弹窗，批次摘要作为 custom entry 渲染进对话流
+ *   （会话里可见、持久保存，但不进入模型上下文）。
  *
  * 无审批能力：不 block、不改参数（提案非目标）。
  * 机制依据 M2 验证：turn_end 每 turn 触发；其中 await ctx.ui.select 可阻塞下一请求。
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Box, Text } from "@earendil-works/pi-tui";
 
 const WIDGET_KEY = "observe-summary";
+const ENTRY_TYPE = "observe-summary";
+
+interface SummaryData {
+	lines: string[];
+}
 
 type Mode = "off" | "pause" | "stream";
 
@@ -123,6 +129,15 @@ function buildLines(turnIndex: number, narration: string, tools: ToolItem[], hin
 }
 
 export default function (pi: ExtensionAPI) {
+	pi.registerEntryRenderer<SummaryData>(ENTRY_TYPE, (entry, _opts, theme) => {
+		const data = entry.data ?? { lines: [] };
+		const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
+		for (const line of data.lines) {
+			box.addChild(new Text(line, 0, 0));
+		}
+		return box;
+	});
+
 	pi.registerCommand("observe", {
 		description: "Cycle observe mode: off → pause (step at turn boundaries) → stream (summary into transcript) → off",
 		handler: async (_args, ctx) => {
@@ -147,14 +162,13 @@ export default function (pi: ExtensionAPI) {
 		const turnIndex = (event as { turnIndex?: number }).turnIndex ?? 0;
 
 		if (mode === "stream") {
-			// 信息流模式：摘要作为 custom_message 条目留在对话流，不暂停
+			// 信息流模式：custom entry 渲染进对话流，但不进入模型上下文（不花 token）
 			return {
 				entries: [
 					{
-						type: "custom_message",
-						customType: "observe-summary",
-						content: buildLines(turnIndex, narration, tools, false).join("\n"),
-						display: true,
+						type: "custom",
+						customType: ENTRY_TYPE,
+						data: { lines: buildLines(turnIndex, narration, tools, false) } satisfies SummaryData,
 					},
 				],
 			};
