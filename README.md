@@ -36,23 +36,24 @@ pi install git:github.com/civaapple-alt/pi-extensions
 
 ```
 ~/.pi/agent/
-├── git/github.com/civaapple-alt/pi-extensions/     # git 克隆缓存（带 remote，用于 fetch 更新）
-├── tmp/extensions/git-github.com/0c514c46/         # 实际加载的副本，目录名 = 锁定的 commit 短哈希
-│   └── civaapple-alt/pi-extensions/
+├── git/github.com/civaapple-alt/pi-extensions/     # 克隆缓存 = 扩展的实际加载来源（pi list 显示此路径）
+├── tmp/extensions/<hash>/                          # npm 依赖工作区：仅在 install/update 装依赖时使用，
+│                                                   #   与代码加载无关，删除不影响运行（会自动按需重建）
 ├── extensions/                                      # 散装扩展目录（渠道 1）
 └── settings.json                                    # packages 声明: ["git:github.com/civaapple-alt/pi-extensions"]
 ```
 
-**pi 永远加载 `tmp/<hash>/` 下的副本**，且 git 源会 pinned 到安装时的 commit——远程 main 推了新提交，不执行 `pi update` 就仍跑旧版本（可复现特性）。
+**pi 直接加载 `git/` 缓存克隆里的代码**；git 源会跟踪分支——`pi update --extensions` 在缓存克隆里 fetch + 推进 HEAD，之后 `/reload`（或新会话）即运行新版本。
 
 ### 更新流程
 
 ```
 改本地工作副本 → commit → push 远程
-→ pi update --extensions
-   ├─ git/ 目录 fetch 拿到新 commit
-   └─ tmp/ 出现新哈希目录，加载切换到新版本（旧目录由 pi 清理）
+→ pi update --extensions     # 在 git/ 缓存克隆里 fetch 并推进 HEAD
+→ /reload（或开新会话）        # 加载源已更新，立即生效
 ```
+
+验证当前加载版本：`pi list` 查看包路径指向的克隆，`git -C <该路径> log --oneline -1`。
 
 开发期想立即试本地改动、不走 push：
 
