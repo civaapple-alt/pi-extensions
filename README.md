@@ -10,6 +10,14 @@ pi install git:github.com/civaapple-alt/pi-extensions
 
 > 注意：若 `~/.pi/agent/extensions/` 下已存在同名扩展文件，请先移除，避免命令重复注册。
 
+### 只想要其中某一个？
+
+`pi install` 的单位是整个包（三个扩展一起装），但有三种做法：
+
+1. **`pi config` 逐个禁用**（推荐）：装完运行 `pi config`，找到 pi-extensions 段，空格取消不想要的扩展
+2. **默认都不扰民**：observe 需 `/observe` 开启、probe 需 `PI_PROBE=1` 启动、router 是不选就不生效的虚拟模型——全装也零影响，除非主动启用
+3. **本地单文件安装**：`pi install ./pi-extensions/extensions/observe.ts`（文件路径=只装这一个）
+
 ## 扩展一览
 
 ### observe — 观察模式
