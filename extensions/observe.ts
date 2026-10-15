@@ -1,12 +1,14 @@
 /**
  * Observe Mode — 观察模式（M3，提案见 docs/proposals/observe-mode.md）
  *
- * /observe            切换观察模式（默认关）
+ * /observe  三态循环：关 → 步进 → 信息流 → 关
  *
- * 开启后，每个含工具调用的 turn 边界暂停：
- * - 上方 widget 展示批次摘要（报幕叙述 + 工具清单 + codemode 嵌套展开）
- * - 对话框三选：继续（步进）/ 放行到结束 / 终止 run
- * - 对话框按 Esc 视为"继续"
+ * 步进（pause）：每个含工具调用的 turn 边界暂停——上方 widget 展示批次摘要
+ *   （报幕叙述 + 工具清单 + codemode 嵌套展开），对话框三选：
+ *   继续（步进）/ 放行到结束 / 终止 run。Esc 视同继续。
+ *
+ * 信息流（stream）：不暂停不弹窗，把批次摘要作为 custom_message 条目
+ *   留在对话流中，供事后翻阅。
  *
  * 无审批能力：不 block、不改参数（提案非目标）。
  * 机制依据 M2 验证：turn_end 每 turn 触发；其中 await ctx.ui.select 可阻塞下一请求。
@@ -15,8 +17,16 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const WIDGET_KEY = "observe-summary";
 
-let enabled = false;
+type Mode = "off" | "pause" | "stream";
+
+let mode: Mode = "off";
 let releaseRun = false;
+
+const MODE_LABEL: Record<Mode, string> = {
+	off: "关",
+	pause: "步进 · 每个含工具的 turn 边界暂停",
+	stream: "信息流 · 摘要写入对话流（免交互）",
+};
 
 function summarize(value: unknown, max = 90): string {
 	try {
@@ -89,7 +99,7 @@ function attachNested(event: unknown, tools: ToolItem[]) {
 	}
 }
 
-function buildLines(turnIndex: number, narration: string, tools: ToolItem[]): string[] {
+function buildLines(turnIndex: number, narration: string, tools: ToolItem[], hints = true): string[] {
 	const step = turnIndex + 1; // 事件零索引，界面从一计
 	const lines: string[] = [`── Observe · step ${step} ──`];
 	if (narration) {
@@ -105,18 +115,20 @@ function buildLines(turnIndex: number, narration: string, tools: ToolItem[]): st
 		}
 	}
 	if (tools.length > 8) lines.push(`  …还有 ${tools.length - 8} 个`);
-	lines.push("");
-	lines.push("继续=步进 · 放行=到 run 结束 · Esc=继续");
+	if (hints) {
+		lines.push("");
+		lines.push("继续=步进 · 放行=到 run 结束 · Esc=继续");
+	}
 	return lines;
 }
 
 export default function (pi: ExtensionAPI) {
 	pi.registerCommand("observe", {
-		description: "Toggle observe mode (pause at each tool-turn boundary)",
+		description: "Cycle observe mode: off → pause (step at turn boundaries) → stream (summary into transcript) → off",
 		handler: async (_args, ctx) => {
-			enabled = !enabled;
+			mode = mode === "off" ? "pause" : mode === "pause" ? "stream" : "off";
 			releaseRun = false;
-			ctx.ui.notify(`observe: ${enabled ? "开 · 每个含工具的 turn 边界暂停" : "关"}`, "info");
+			ctx.ui.notify(`observe: ${MODE_LABEL[mode]}`, "info");
 		},
 	});
 
@@ -125,15 +137,31 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
-		if (!enabled || !ctx.hasUI || ctx.mode !== "tui") return;
-		if (releaseRun) return;
+		if (mode === "off" || !ctx.hasUI || ctx.mode !== "tui") return;
 
 		const { narration, tools } = extractBatch((event as { message?: unknown }).message);
-		if (tools.length === 0) return; // 纯文字 turn：run 即将自然结束，无需暂停
+		if (tools.length === 0) return; // 纯文字 turn：run 即将自然结束，无需观察
 
 		attachNested(event, tools);
 
 		const turnIndex = (event as { turnIndex?: number }).turnIndex ?? 0;
+
+		if (mode === "stream") {
+			// 信息流模式：摘要作为 custom_message 条目留在对话流，不暂停
+			return {
+				entries: [
+					{
+						type: "custom_message",
+						customType: "observe-summary",
+						content: buildLines(turnIndex, narration, tools, false).join("\n"),
+						display: true,
+					},
+				],
+			};
+		}
+
+		if (releaseRun) return;
+
 		ctx.ui.setWidget(WIDGET_KEY, buildLines(turnIndex, narration, tools), { placement: "aboveEditor" });
 		try {
 			const choice = await ctx.ui.select(`Observe · step ${turnIndex + 1} · ${tools.length} 个工具`, ["继续", "放行到结束", "终止"]);

@@ -2,6 +2,18 @@
 
 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Added (observe)
+
+- 信息流模式：`/observe` 改为三态循环（关 → 步进 → 信息流 → 关）；信息流模式不暂停不弹窗，将批次摘要作为消息条目写入对话流，供事后翻阅
+
+## [0.2.1] - 2026-10-15
+
+### Docs
+
+- 添加 CHANGELOG（Keep a Changelog 格式）
+
 ## [0.2.0] - 2026-10-15
 
 ### Changed (observe)
