@@ -33,6 +33,28 @@ interface ToolItem {
 	nested?: string[];
 }
 
+/** 单行压缩（参数展示用） */
+function oneLine(s: string, max = 100): string {
+	const t = s.replace(/\s+/g, " ").trim();
+	return t.length > max ? t.slice(0, max - 1) + "…" : t;
+}
+
+/** 按工具类型取最有信息量的参数字段，其余回退 JSON 摘要 */
+function formatArgs(tool: string, input: unknown): string {
+	const obj = input as Record<string, unknown> | undefined;
+	switch (tool) {
+		case "bash":
+		case "powershell":
+			return typeof obj?.command === "string" ? oneLine(obj.command) : summarize(input);
+		case "read":
+		case "edit":
+		case "write":
+			return typeof obj?.path === "string" ? String(obj.path) : summarize(input);
+		default:
+			return summarize(input);
+	}
+}
+
 function extractBatch(message: unknown): { narration: string; tools: ToolItem[] } {
 	const narrationParts: string[] = [];
 	const tools: ToolItem[] = [];
@@ -44,7 +66,7 @@ function extractBatch(message: unknown): { narration: string; tools: ToolItem[] 
 			} else if (part.type === "toolCall") {
 				tools.push({
 					name: String(part.name ?? "?"),
-					args: summarize(part.arguments),
+					args: formatArgs(String(part.name ?? ""), part.arguments),
 					id: String(part.id ?? ""),
 				} as ToolItem);
 			}
@@ -68,7 +90,8 @@ function attachNested(event: unknown, tools: ToolItem[]) {
 }
 
 function buildLines(turnIndex: number, narration: string, tools: ToolItem[]): string[] {
-	const lines: string[] = [`── Observe · turn ${turnIndex} ──`];
+	const step = turnIndex + 1; // 事件零索引，界面从一计
+	const lines: string[] = [`── Observe · step ${step} ──`];
 	if (narration) {
 		lines.push(narration);
 		lines.push("");
@@ -110,10 +133,10 @@ export default function (pi: ExtensionAPI) {
 
 		attachNested(event, tools);
 
-		const turnIndex = (event as { turnIndex?: number }).turnIndex ?? "?";
+		const turnIndex = (event as { turnIndex?: number }).turnIndex ?? 0;
 		ctx.ui.setWidget(WIDGET_KEY, buildLines(turnIndex, narration, tools), { placement: "aboveEditor" });
 		try {
-			const choice = await ctx.ui.select(`Observe · turn ${turnIndex} · ${tools.length} 个工具`, ["继续", "放行到结束", "终止"]);
+			const choice = await ctx.ui.select(`Observe · step ${turnIndex + 1} · ${tools.length} 个工具`, ["继续", "放行到结束", "终止"]);
 			if (choice === "放行到结束") releaseRun = true;
 			else if (choice === "终止") ctx.abort();
 			// 继续 / undefined(Esc) → 单步放行
