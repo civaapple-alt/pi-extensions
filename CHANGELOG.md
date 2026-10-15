@@ -2,7 +2,7 @@
 
 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.4.0] - 2026-10-15
 
 ### Changed (observe)
 
@@ -36,6 +36,7 @@
 - **kimi-auto-router**：虚拟模型 `router/auto`，规划阶段留在当前模型保持缓存命中，Jev 分类器判定进入实现后自动切换到 `kimi-coding/k3-256k`
 - **probe**：事件探针（开发工具）。`PI_PROBE=1` 启动时把 agent 事件流写入日志，`/probe dialog` 可测试 turn 边界阻塞对话框
 
+[0.4.0]: https://github.com/civaapple-alt/pi-extensions/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/civaapple-alt/pi-extensions/compare/v0.2.1...v0.3.0
 [0.2.0]: https://github.com/civaapple-alt/pi-extensions/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/civaapple-alt/pi-extensions/releases/tag/v0.1.0
